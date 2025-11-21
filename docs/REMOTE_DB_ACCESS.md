@@ -2,17 +2,122 @@
 
 This guide explains how to access the SQLite database on your Raspberry Pi 5 from your Mac.
 
+## Quick Start (For Database IDEs)
+
+**Want to use DataGrip, DBeaver, or TablePlus?** The simplest method is to mount your Pi as a local drive:
+
+```bash
+# Install SSHFS (one-time setup)
+brew install --cask macfuse
+brew install gromgit/fuse/sshfs-mac
+
+# Mount your Pi
+mkdir -p ~/mnt/pi
+sshfs pi:/home/luc-b/apps/pet-trainer-bot ~/mnt/pi
+
+# Open in your IDE
+# Path: ~/mnt/pi/data/training.db
+```
+
+See [Option 1](#option-1-mount-pi-filesystem-simplest-for-db-ides) for detailed instructions.
+
+---
+
 ## Table of Contents
 
-- [Option 1: SSH Tunnel + SQLite Client (Recommended)](#option-1-ssh-tunnel--sqlite-client-recommended)
-- [Option 2: Direct File Access via SSHFS](#option-2-direct-file-access-via-sshfs)
-- [Option 3: Database Sync Script](#option-3-database-sync-script)
+- [Option 1: Mount Pi Filesystem (Simplest for DB IDEs)](#option-1-mount-pi-filesystem-simplest-for-db-ides)
+- [Option 2: Database Sync Script](#option-2-database-sync-script)
+- [Option 3: SSH Tunnel + SQLite Client](#option-3-ssh-tunnel--sqlite-client)
 - [GUI Database Tools](#gui-database-tools)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
-## Option 1: SSH Tunnel + SQLite Client (Recommended)
+## Option 1: Mount Pi Filesystem (Simplest for DB IDEs)
+
+**⭐ Recommended for DataGrip, DBeaver, TablePlus, and other database IDEs**
+
+This method mounts your Pi's filesystem as a local drive on your Mac, making the database file accessible as if it were local. This is the simplest way to use any database IDE.
+
+### Install SSHFS on Mac
+
+```bash
+# Install macFUSE and SSHFS
+brew install --cask macfuse
+brew install gromgit/fuse/sshfs-mac
+```
+
+**Note:** After installing macFUSE, you may need to:
+1. Go to System Preferences → Security & Privacy
+2. Allow the system extension from "Benjamin Fleischer"
+3. Restart your Mac
+
+### Mount Your Pi
+
+```bash
+# Create mount point
+mkdir -p ~/mnt/pi
+
+# Mount the Pi's filesystem
+sshfs pi:/home/luc-b/apps/pet-trainer-bot ~/mnt/pi
+
+# Verify it's mounted
+ls ~/mnt/pi/data/
+```
+
+### Access Database in Your IDE
+
+Now you can open the database in any IDE as a local file:
+
+**Path to database:** `~/mnt/pi/data/training.db`
+
+**For DataGrip:**
+1. New Data Source → SQLite
+2. File: `~/mnt/pi/data/training.db`
+3. Test Connection → OK
+
+**For DBeaver:**
+1. Database → New Database Connection → SQLite
+2. Path: `~/mnt/pi/data/training.db`
+3. Test Connection → Finish
+
+**For TablePlus:**
+1. Create a new connection → SQLite
+2. Database path: `~/mnt/pi/data/training.db`
+3. Connect
+
+### Unmount When Done
+
+```bash
+# Unmount the Pi
+umount ~/mnt/pi
+
+# Or on macOS:
+diskutil unmount ~/mnt/pi
+```
+
+### Auto-mount on Login (Optional)
+
+Create a script to mount automatically:
+
+```bash
+# Create mount script
+cat > ~/bin/mount-pi.sh << 'EOF'
+#!/bin/bash
+mkdir -p ~/mnt/pi
+sshfs pi:/home/luc-b/apps/pet-trainer-bot ~/mnt/pi -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3
+echo "✅ Pi mounted at ~/mnt/pi"
+EOF
+
+chmod +x ~/bin/mount-pi.sh
+
+# Run it
+~/bin/mount-pi.sh
+```
+
+---
+
+## Option 2: Database Sync Script
 
 This method creates an SSH tunnel to access the database file remotely.
 
@@ -86,70 +191,54 @@ sqlite3 training-local.db
 
 ---
 
-## Option 2: Direct File Access via SSHFS
+## Option 3: SSH Tunnel + SQLite Client
 
-Mount the Pi's filesystem on your Mac for direct file access.
+This method provides command-line access to the database via SSH.
 
-### Install SSHFS on Mac
+### Setup SSH Config
+
+If you haven't already, create an SSH config for easy access:
 
 ```bash
-# Install macFUSE and SSHFS
-brew install --cask macfuse
-brew install gromgit/fuse/sshfs-mac
+# On your Mac
+nano ~/.ssh/config
 ```
 
-**Note:** You may need to restart your Mac after installing macFUSE.
+Add this configuration (adjust as needed):
 
-### Mount Pi Filesystem
-
-```bash
-# Create mount point
-mkdir -p ~/mnt/pi
-
-# Mount the Pi
-sshfs pi:/home/pi ~/mnt/pi -o volname=RaspberryPi
-
-# Access the database
-cd ~/mnt/pi/apps/pet-trainer-bot
-sqlite3 training.db
+```
+Host pi
+    HostName 192.168.1.22       # or use raspberrypi.local
+    User luc-b                   # your Pi username
+    Port 22
+    IdentityFile ~/.ssh/id_rsa   # your SSH key
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
 ```
 
-### Unmount When Done
+### Access Database via SSH
+
+**Direct SQLite access via SSH**
 
 ```bash
-umount ~/mnt/pi
-# or
-diskutil unmount ~/mnt/pi
-```
+# On your Mac - access SQLite CLI on Pi
+ssh pi "sqlite3 ~/apps/pet-trainer-bot/data/training.db"
 
-### Auto-mount Script (Optional)
+# Or run specific queries
+ssh pi "sqlite3 ~/apps/pet-trainer-bot/data/training.db 'SELECT * FROM trainings;'"
 
-Create `~/bin/mount-pi.sh`:
+# Copy database file temporarily
+scp pi:~/apps/pet-trainer-bot/data/training.db ./training-local.db
 
-```bash
-#!/bin/bash
-MOUNT_POINT="$HOME/mnt/pi"
-
-if mount | grep "$MOUNT_POINT" > /dev/null; then
-    echo "Pi already mounted"
-else
-    mkdir -p "$MOUNT_POINT"
-    sshfs pi:/home/pi "$MOUNT_POINT" -o volname=RaspberryPi
-    echo "Pi mounted at $MOUNT_POINT"
-fi
-```
-
-Make it executable:
-
-```bash
-chmod +x ~/bin/mount-pi.sh
+# Open with local SQLite client
+sqlite3 training-local.db
 ```
 
 ---
 
-## Option 3: Database Sync Script
+## Option 2: Database Sync Script
 
-Automatically sync database changes between Pi and Mac.
+Automatically sync database changes between Pi and Mac using the included sync script.
 
 ### Create Sync Script on Mac
 

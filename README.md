@@ -138,18 +138,27 @@ When training completes, you'll receive a reminder with two buttons:
 
 ```
 PetTrainerNotificationBot/
-├── src/
+├── src/                      # Source code
 │   ├── index.ts              # Main entry point
 │   ├── types.ts              # TypeScript types and constants
 │   ├── timeUtils.ts          # Time calculation utilities
-│   ├── sheetsService.ts      # Google Sheets integration
+│   ├── databaseService.ts    # SQLite database service
 │   ├── scheduler.ts          # Training reminder scheduler
 │   ├── botCommands.ts        # Command handlers
 │   └── callbackHandlers.ts  # Inline button handlers
-├── package.json
-├── tsconfig.json
-├── .env.example
-└── README.md
+├── scripts/                  # Deployment and utility scripts
+│   ├── setup-pi.sh           # Raspberry Pi setup script
+│   └── sync-pi-db.sh         # Database sync tool (Mac ↔️ Pi)
+├── docs/                     # Documentation
+│   ├── PI_QUICKSTART.md      # Quick start guide
+│   ├── DEPLOYMENT_GUIDE.md   # Complete deployment guide
+│   ├── PM2_COMMANDS.md       # PM2 command reference
+│   └── ...                   # Additional documentation
+├── build/                    # Compiled JavaScript (generated)
+├── ecosystem.config.cjs      # PM2 configuration
+├── package.json              # Dependencies
+├── tsconfig.json             # TypeScript config
+└── README.md                 # This file
 ```
 
 ## Database Structure
@@ -204,6 +213,53 @@ If NPC C rental expires in 48 hours but training takes 50 hours:
 - You'll gain 96% progress (24 cycles × 4%)
 - Bot will notify you of the expected progress
 
+## Production Deployment (Raspberry Pi 5)
+
+### Quick Start with PM2
+
+Deploy the bot to run 24/7 on your Raspberry Pi 5:
+
+```bash
+# On your Mac - copy project to Pi
+rsync -avz --exclude 'node_modules' --exclude 'build' --exclude '.git' . pi:~/apps/pet-trainer-bot/
+
+# SSH to Pi and run setup
+ssh pi "cd ~/apps/pet-trainer-bot && chmod +x scripts/setup-pi.sh && ./scripts/setup-pi.sh"
+
+# Configure .env file on Pi
+ssh pi "nano ~/apps/pet-trainer-bot/.env"
+
+# Start with PM2
+ssh pi "cd ~/apps/pet-trainer-bot && pm2 start ecosystem.config.cjs && pm2 save"
+```
+
+### Features
+
+- ✅ **24/7 operation** - Bot runs continuously
+- ✅ **Auto-restart** - Automatically restarts if it crashes
+- ✅ **Boot persistence** - Starts automatically when Pi reboots
+- ✅ **Log management** - Automatic log rotation
+- ✅ **Remote monitoring** - Monitor and control from your Mac
+- ✅ **Remote database access** - Access SQLite database from your Mac
+
+### Quick Commands
+
+```bash
+# From your Mac
+ssh pi "pm2 status"                       # Check bot status
+ssh pi "pm2 logs pet-trainer-bot"         # View logs
+ssh pi "pm2 restart pet-trainer-bot"      # Restart bot
+./scripts/sync-pi-db.sh pull              # Pull database to Mac
+./scripts/sync-pi-db.sh status            # Check database status
+```
+
+### Documentation
+
+- **[docs/PI_QUICKSTART.md](docs/PI_QUICKSTART.md)** - Get started in 10 minutes
+- **[docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)** - Complete deployment guide
+- **[docs/PM2_COMMANDS.md](docs/PM2_COMMANDS.md)** - All PM2 commands
+- **[docs/REMOTE_DB_ACCESS.md](docs/REMOTE_DB_ACCESS.md)** - Database access from Mac
+
 ## Database Management
 
 ### Viewing the Database
@@ -212,7 +268,7 @@ You can view and edit the SQLite database using various tools:
 
 **Command Line:**
 ```bash
-sqlite3 training.db
+sqlite3 data/training.db
 .tables
 SELECT * FROM trainings;
 .quit
@@ -223,18 +279,36 @@ SELECT * FROM trainings;
 - [TablePlus](https://tableplus.com/) (Free tier available)
 - [DBeaver](https://dbeaver.io/) (Free, open-source)
 
+### Remote Database Access (from Mac to Pi)
+
+```bash
+# Pull database from Pi to Mac
+./scripts/sync-pi-db.sh pull
+
+# View database status on both systems
+./scripts/sync-pi-db.sh status
+
+# Create backup from Pi
+./scripts/sync-pi-db.sh backup
+
+# Run query on Pi database
+./scripts/sync-pi-db.sh query "SELECT * FROM trainings WHERE is_active = 1;"
+```
+
+See [docs/REMOTE_DB_ACCESS.md](docs/REMOTE_DB_ACCESS.md) for more options including SSHFS mounting and GUI tools.
+
 ### Backup
 
 Simply copy the `training.db` file:
 ```bash
-cp training.db training.db.backup
+cp data/training.db data/training.db.backup
 ```
 
 ### Reset Database
 
 To start fresh, delete the database file (it will be recreated on next run):
 ```bash
-rm training.db
+rm data/training.db*
 ```
 
 ## Troubleshooting

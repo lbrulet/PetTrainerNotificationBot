@@ -11,8 +11,8 @@ import { getTrainingDuration, getRentalDays, getTrainingCycle, isTestMode } from
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Database path - stored in project root
-const DB_PATH = path.join(__dirname, '..', 'training.db');
+// Database path - stored in data folder
+const DB_PATH = path.join(__dirname, '..', 'data', 'training.db');
 
 let db: Database.Database | null = null;
 

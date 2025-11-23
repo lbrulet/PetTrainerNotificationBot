@@ -23,6 +23,7 @@ export interface TrainingRow {
   npcRentalStartIso: string;
   npcRentalEndIso: string;
   rentalExpiryNotifiedIso: string;
+  trainingReminderSentIso: string;
 }
 
 /**
@@ -116,6 +117,17 @@ export function getRentalWarningTime(): number {
     return 1 / 60; // 1 minute in hours
   }
   return 24; // 24 hours (1 day) before expiry
+}
+
+/**
+ * Hours before training completion to send reminder
+ * In test mode: 10 seconds
+ */
+export function getTrainingReminderTime(): number {
+  if (isTestMode) {
+    return 10 / 3600; // 10 seconds in hours
+  }
+  return 12; // 12 hours before completion
 }
 
 /**

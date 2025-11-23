@@ -7,6 +7,7 @@ A Telegram bot that helps manage NPC pet trainers in a game using SQLite as a da
 - **Multi-user support** - Each user has their own 3 NPCs (C, B, A)
 - **Track multiple NPC trainers** (C, B, and A types per user)
 - **Automatic reminders** when training completes (sent to the specific user)
+- **12-hour advance reminder** - Get notified 12 hours before training finishes so you can prepare the next pet
 - **Interactive buttons** to reset or stop training
 - **SQLite database** for fast, reliable local storage
 - **User-specific data** - Each user's trainings are completely independent
@@ -364,6 +365,7 @@ npm run dev  # Test mode ON by default
 - 🏃 NPC rental: 30 minutes (vs 15 days)
 - 🏃 Scheduler: checks every 10 seconds (vs 1 minute)
 - 🏃 Rental warning: 1 minute before expiry (vs 24 hours)
+- 🏃 Training reminder: 10 seconds before completion (vs 12 hours)
 
 ### Tech Stack
 

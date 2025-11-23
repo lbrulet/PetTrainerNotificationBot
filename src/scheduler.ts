@@ -3,10 +3,10 @@
  */
 
 import TelegramBot from 'node-telegram-bot-api';
-import { getAllTrainings, markAsNotified, isNpcRentalActive, stopTraining, markRentalExpiryNotified } from './databaseService.js';
+import { getAllTrainings, markAsNotified, isNpcRentalActive, stopTraining, markRentalExpiryNotified, markTrainingReminderSent } from './databaseService.js';
 import { isTrainingFinished } from './timeUtils.js';
 import type { NpcType } from './types.js';
-import { getSchedulerInterval, isTestMode, getRentalWarningTime } from './types.js';
+import { getSchedulerInterval, isTestMode, getRentalWarningTime, getTrainingReminderTime } from './types.js';
 
 let schedulerInterval: NodeJS.Timeout | null = null;
 
@@ -113,6 +113,38 @@ async function checkTrainings(bot: TelegramBot, ownerId: number): Promise<void> 
         continue;
       }
 
+      // Check for 12-hour reminder (before training finishes)
+      if (!training.trainingReminderSentIso) {
+        const now = new Date();
+        const endTime = new Date(training.endIso);
+        const hoursUntilCompletion = (endTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const reminderTime = getTrainingReminderTime();
+        
+        // Send reminder if within reminder window but training not finished yet
+        if (hoursUntilCompletion > 0 && hoursUntilCompletion <= reminderTime) {
+          console.log(`User ${training.userId} - NPC ${training.npcType} training finishing soon - sending reminder`);
+          
+          const timeText = isTestMode 
+            ? `${Math.round(hoursUntilCompletion * 3600)} seconds`
+            : hoursUntilCompletion < 1 
+              ? `${Math.round(hoursUntilCompletion * 60)} minutes`
+              : `${Math.round(hoursUntilCompletion)} hours`;
+          
+          const petType = training.npcType === 'C' ? 'C' : training.npcType === 'B' ? 'B' : 'A';
+          
+          await sendToUser(
+            bot,
+            training.userId,
+            `⏰ Training reminder for NPC ${training.npcType}!\n\n` +
+            `Your pet will finish training in ${timeText}.\n\n` +
+            `💡 Make sure you have a Pet ${petType} ready to start the next training session!`
+          );
+          
+          await markTrainingReminderSent(training.userId, training.npcType);
+          continue; // Don't send completion message yet
+        }
+      }
+
       // Check if training is finished
       if (!isTrainingFinished(training.endIso)) {
         continue;
@@ -123,7 +155,7 @@ async function checkTrainings(bot: TelegramBot, ownerId: number): Promise<void> 
         continue;
       }
 
-      // Send reminder
+      // Send completion reminder
       const message = `🎉 Training finished for NPC ${training.npcType}!\n\nWhat would you like to do?`;
 
       await sendToUser(bot, training.userId, message, {
@@ -132,7 +164,7 @@ async function checkTrainings(bot: TelegramBot, ownerId: number): Promise<void> 
 
       // Mark as notified
       markAsNotified(training.userId, training.npcType);
-      console.log(`Sent reminder to user ${training.userId} for NPC ${training.npcType}`);
+      console.log(`Sent completion reminder to user ${training.userId} for NPC ${training.npcType}`);
     }
   } catch (error) {
     console.error('Error checking trainings:', error);

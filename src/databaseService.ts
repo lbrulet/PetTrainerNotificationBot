@@ -47,14 +47,16 @@ export function initializeDatabase(): void {
       npc_rental_start_iso TEXT,
       npc_rental_end_iso TEXT,
       rental_expiry_notified_iso TEXT,
+      training_reminder_sent_iso TEXT,
       PRIMARY KEY (user_id, npc_type)
     )
   `);
 
   console.log('✅ Database schema initialized');
   
-  // Run migration if needed
+  // Run migrations if needed
   migrateOldDatabase();
+  addTrainingReminderColumn();
 }
 
 /**
@@ -98,6 +100,7 @@ function migrateOldDatabase(): void {
         npc_rental_start_iso TEXT,
         npc_rental_end_iso TEXT,
         rental_expiry_notified_iso TEXT,
+        training_reminder_sent_iso TEXT,
         PRIMARY KEY (user_id, npc_type)
       )
     `);
@@ -128,6 +131,33 @@ function migrateOldDatabase(): void {
 }
 
 /**
+ * Add training_reminder_sent_iso column if it doesn't exist
+ */
+function addTrainingReminderColumn(): void {
+  const db = getDatabase();
+  
+  try {
+    // Check if column exists
+    const tableInfo = db.prepare("PRAGMA table_info(trainings)").all() as any[];
+    const hasColumn = tableInfo.some((col: any) => col.name === 'training_reminder_sent_iso');
+    
+    if (hasColumn) {
+      // Already has the column
+      return;
+    }
+    
+    console.log('🔄 Adding training_reminder_sent_iso column...');
+    
+    // Add the column
+    db.exec('ALTER TABLE trainings ADD COLUMN training_reminder_sent_iso TEXT');
+    
+    console.log('✅ Column added successfully');
+  } catch (error) {
+    console.error('❌ Failed to add training_reminder_sent_iso column:', error);
+  }
+}
+
+/**
  * Convert database row to TrainingRow
  */
 function dbRowToTrainingRow(row: any): TrainingRow {
@@ -142,6 +172,7 @@ function dbRowToTrainingRow(row: any): TrainingRow {
     npcRentalStartIso: row.npc_rental_start_iso || '',
     npcRentalEndIso: row.npc_rental_end_iso || '',
     rentalExpiryNotifiedIso: row.rental_expiry_notified_iso || '',
+    trainingReminderSentIso: row.training_reminder_sent_iso || '',
   };
 }
 
@@ -253,7 +284,8 @@ export function startTraining(userId: number, npcType: NpcType): TrainingRow {
         duration_hours = ?,
         end_iso = ?,
         is_active = 1,
-        last_notified_iso = NULL
+        last_notified_iso = NULL,
+        training_reminder_sent_iso = NULL
     WHERE user_id = ? AND npc_type = ?
   `).run(now.toISOString(), durationHours, endTime.toISOString(), userId, npcType);
 
@@ -334,6 +366,20 @@ export function markRentalExpiryNotified(userId: number, npcType: NpcType): void
   db.prepare(`
     UPDATE trainings
     SET rental_expiry_notified_iso = ?
+    WHERE user_id = ? AND npc_type = ?
+  `).run(now, userId, npcType);
+}
+
+/**
+ * Mark training reminder as sent (12-hour warning)
+ */
+export function markTrainingReminderSent(userId: number, npcType: NpcType): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE trainings
+    SET training_reminder_sent_iso = ?
     WHERE user_id = ? AND npc_type = ?
   `).run(now, userId, npcType);
 }

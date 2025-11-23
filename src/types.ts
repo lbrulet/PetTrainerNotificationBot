@@ -27,13 +27,20 @@ export interface TrainingRow {
 
 /**
  * Test mode flag - automatically set from environment variable
+ * Test mode is disabled in production environments
  */
-export let isTestMode = process.env.TEST_MODE === 'true';
+const isProduction = process.env.NODE_ENV === 'production';
+export let isTestMode = !isProduction && process.env.TEST_MODE === 'true';
 
 /**
  * Enable or disable test mode
+ * Test mode cannot be enabled in production
  */
 export function setTestMode(enabled: boolean): void {
+  if (isProduction && enabled) {
+    console.log('⚠️  Test mode cannot be enabled in production environment');
+    return;
+  }
   isTestMode = enabled;
   console.log(`🧪 Test mode ${enabled ? 'ENABLED' : 'DISABLED'}`);
 }

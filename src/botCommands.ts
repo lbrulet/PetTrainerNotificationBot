@@ -79,7 +79,7 @@ Rental:
 
 Info:
 /status - View all your trainings
-/testmode - Toggle test mode
+/testmode - Toggle test mode (owner only, dev mode only)
 /start - Show this message
 
 💡 TIP: I'll automatically pause training if your NPC rental expires!
@@ -313,6 +313,7 @@ export const handleRentalA = (bot: TelegramBot, msg: TelegramBot.Message, ownerI
 
 /**
  * Handle /testmode command
+ * Only owner can toggle test mode, and only in non-production environments
  */
 export async function handleTestMode(
   bot: TelegramBot,
@@ -323,8 +324,19 @@ export async function handleTestMode(
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
 
-  if (!userId || !isAuthorized(userId, ownerId)) {
-    await bot.sendMessage(chatId, '❌ Not authorized.');
+  // Only owner can use test mode
+  if (!userId || userId !== ownerId) {
+    await bot.sendMessage(chatId, '❌ Only the bot owner can toggle test mode.');
+    return;
+  }
+
+  // Prevent test mode in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction) {
+    await bot.sendMessage(
+      chatId,
+      '❌ Test mode is disabled in production.\n\nTo enable test mode, run the bot in development mode.'
+    );
     return;
   }
 

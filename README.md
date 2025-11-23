@@ -342,7 +342,11 @@ rm data/training.db*
 
 ### Test Mode
 
-Test mode accelerates all timers for rapid local testing:
+Test mode accelerates all timers for rapid local testing.
+
+**⚠️ Restrictions:**
+- **Owner only**: Only the bot owner can toggle test mode
+- **Development only**: Test mode is disabled when `NODE_ENV=production`
 
 **Automatic activation:**
 ```bash
@@ -350,8 +354,8 @@ npm run dev  # Test mode ON by default
 ```
 
 **Manual toggle:**
-- Use `/testmode` command in Telegram
-- Or set `TEST_MODE=true` environment variable
+- Use `/testmode` command in Telegram (owner only)
+- Or set `TEST_MODE=true` environment variable (dev mode only)
 
 **Test mode timers:**
 - 🏃 NPC C training: 1 minute (vs 50 hours)
